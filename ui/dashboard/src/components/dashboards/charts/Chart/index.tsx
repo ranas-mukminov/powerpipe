@@ -958,34 +958,28 @@ const Chart = ({ options, searchPathPrefix, type }: ChartComponentProps) => {
   }, []);
 
   useEffect(() => {
-    // Capture a snapshot for print mode. During multi-connection streaming /
-    // navigation, panels can unmount while echarts is still loading or already
-    // disposed — guard before calling getDataURL (see #1144).
+    // Capture a snapshot for print mode. echarts-for-react can hand back a
+    // temporary instance that has not had setOption applied yet (no _model);
+    // getDataURL then throws "Cannot read properties of undefined (reading 'get')"
+    // (#1144). Wait for the dynamic echarts import, skip a missing instance, and
+    // let try/catch cover that pre-init path.
     if (!chartRef.current || !options || !echarts) {
       return;
     }
 
-    let cancelled = false;
     try {
       const echartInstance = chartRef.current.getEchartsInstance();
-      if (
-        !echartInstance ||
-        (typeof echartInstance.isDisposed === "function" &&
-          echartInstance.isDisposed())
-      ) {
+      if (!echartInstance) {
         return;
       }
       const dataURL = echartInstance.getDataURL({});
-      if (cancelled || dataURL === imageUrl) {
+      if (dataURL === imageUrl) {
         return;
       }
       setImageUrl(dataURL);
     } catch {
-      // Instance may be mid-dispose when the effect runs after unmount churn.
+      // Temporary pre-init instance from echarts-for-react has no _model yet.
     }
-    return () => {
-      cancelled = true;
-    };
   }, [chartRef, echarts, imageUrl, options]);
 
   if (!options) {
